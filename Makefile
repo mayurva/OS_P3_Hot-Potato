@@ -8,10 +8,10 @@ all: $(objects) master player
 $(objects): $(includes)
 
 master: 
-	cc -o master master.o master_util.o common_util.o
+	cc -o master master.o master_util.o common_util.o -lpthread
 
 player: 
-	cc -o player player.o player_util.o common_util.o
+	cc -o player player.o player_util.o common_util.o -lpthread
 
 .PHONY: clean 
 clean:

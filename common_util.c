@@ -9,7 +9,7 @@
 
 #include"potato.h"
 
-player populate_public_ip(player p)
+player populatePublicIp(player p)
 {
 
 	struct ifaddrs *myaddrs, *ifa;
@@ -51,10 +51,10 @@ player populate_public_ip(player p)
 
 		if (inet_ntop(ifa->ifa_addr->sa_family, in_addr, buf, sizeof(buf))) {
 			if ( ifa->ifa_addr->sa_family == AF_INET && strcmp(ifa->ifa_name, "lo")!=0 ) {
-				printf("\nDo you want master to bind to %s interface?(y/n): ", ifa->ifa_name);
-				scanf("%s", intf);
+				printf("Player is binding to %s interface\n", ifa->ifa_name);
+				/*scanf("%s", intf);
 				if ( strcmp(intf, "n") == 0 )
-					continue;
+					continue;*/
 				sprintf(p.ip_addr, "%s", buf);
 				sprintf(p.iface_name, "%s", ifa->ifa_name);
 			}
@@ -71,3 +71,43 @@ player populate_public_ip(player p)
 	printf("\n\nMy public interface and IP is:  %s %s\n\n", p.iface_name, p.ip_addr);
 	return p;
 }
+
+int createConnection(player_tracker p)
+{
+        struct sockaddr_in sock_client;
+        int slen = sizeof(sock_client);
+        int ret;
+
+        memset((char *) &sock_client, 0, sizeof(sock_client));
+
+        printf("Connecting to a process\nIP Addr: %s\nport: %d\n",p.ip_addr,p.listen_port);
+
+        sock_client.sin_family = AF_INET;
+        sock_client.sin_port = htons(p.listen_port);
+        sock_client.sin_addr.s_addr = inet_addr(p.ip_addr);
+
+        ret = connect(p.conn_port, (struct sockaddr *) &sock_client, slen);
+        if (ret == -1) {
+                printf("Connect failed! Check the IP and port number of the Sever! \n");
+                exit(-1);
+        }
+        printf("Connected to the process\nProcess id %d",p.id);
+}
+
+char* receiveMessage(player_tracker p)
+{
+}
+
+//reduce the buffer length so that message needs to be sent in chunks
+void sendMessage(player_tracker p,char *message)
+{
+        char sendbuf[MAXLEN];
+        strcpy(sendbuf,message);
+        if(send(p.conn_port, sendbuf, MAXLEN, 0) == -1){
+                printf("send failed ");
+                exit(-1);
+        }
+
+        printf("%s message sent\n",message);
+}
+

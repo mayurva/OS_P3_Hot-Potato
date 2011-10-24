@@ -3,8 +3,10 @@
 
 #include"potato.h"
 
-extern player_tracker *players;
+extern int num_of_players;
+extern player_tracker *player_list;
 extern player master;
+extern potato p;
 
 #endif
 
