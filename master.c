@@ -11,8 +11,9 @@ int main(int argc, char *argv[])
 	}
 	initMaster(argc,argv);
 	setupNetwork();
-	ret = sendPotato();	
-	if(ret)		wait_for_message();
+	wait_for_message();
+//	ret = sendPotato();	
+//	if(ret)		wait_for_message();
 	end_game();
 	//joinThreads();
 	return 0;

@@ -51,7 +51,9 @@ player populatePublicIp(player p)
 
 		if (inet_ntop(ifa->ifa_addr->sa_family, in_addr, buf, sizeof(buf))) {
 			if ( ifa->ifa_addr->sa_family == AF_INET && strcmp(ifa->ifa_name, "lo")!=0 ) {
-				printf("Player is binding to %s interface\n", ifa->ifa_name);
+				#ifdef DEBUG
+					printf("Player is binding to %s interface\n", ifa->ifa_name);
+				#endif
 				/*scanf("%s", intf);
 				if ( strcmp(intf, "n") == 0 )
 					continue;*/
@@ -67,8 +69,9 @@ player populatePublicIp(player p)
 		printf("Either no Interface is up or you did not select any interface ..... \nmaster Exiting .... \n\n");
 		exit(0);
 	}
-
-	printf("\n\nMy public interface and IP is:  %s %s\n\n", p.iface_name, p.ip_addr);
+	#ifdef DEBUG
+		printf("\n\nMy public interface and IP is:  %s %s\n\n", p.iface_name, p.ip_addr);
+	#endif
 	return p;
 }
 
@@ -79,8 +82,10 @@ int createConnection(player_tracker p)
         int ret;
 
         memset((char *) &sock_client, 0, sizeof(sock_client));
-
-        printf("Connecting to a process\nIP Addr: %s\nport: %d\n",p.ip_addr,p.listen_port);
+	
+	#ifdef DEBUG
+	        printf("Connecting to a process\nIP Addr: %s\nport: %d\n",p.ip_addr,p.listen_port);
+	#endif
 
         sock_client.sin_family = AF_INET;
         sock_client.sin_port = htons(p.listen_port);
@@ -91,7 +96,10 @@ int createConnection(player_tracker p)
                 printf("Connect failed! Check the IP and port number of the Server! \n");
                 exit(-1);
         }
-        printf("Connected to the process\nProcess id %d\n",p.id);
+	
+	#ifdef DEBUG
+        	printf("Connected to the process\nProcess id %d\n",p.id);
+	#endif
 }
 
 char* receiveMessage(player_tracker p)
@@ -108,6 +116,8 @@ void sendMessage(player_tracker p,char *message)
                 exit(-1);
         }
 
-        printf("%s message sent\n",message);
+	#ifdef DEBUG
+	        printf("%s message sent\n",message);
+	#endif
 }
 

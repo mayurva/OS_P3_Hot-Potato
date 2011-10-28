@@ -1,8 +1,10 @@
 #ifndef POTATO
 #define POTATO
 
-#define DEBUG
+//#define DEBUG
 #define MAXLEN 1000
+#define TRUE 1
+#define FALSE 0
 
 typedef struct player_tracker_{
 	int id;
