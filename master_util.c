@@ -7,6 +7,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <sys/select.h>
 
 #include"potato.h"
 #include"master.h"
@@ -26,9 +27,11 @@ void initMaster(int argc,char *argv[])
 	master.id = 0;
 	master = populatePublicIp(master);
 	
-	printf("in init master\n");
+	#ifdef DEBUG
+		printf("in init master\n");
+	#endif
 	
-	printf("%s\n%s\n%s",argv[0],argv[1],argv[2]);
+	//printf("%s\n%s\n%s",argv[0],argv[1],argv[2]);
 
 	master.listen_port = atoi(argv[1]);
 
@@ -39,7 +42,9 @@ void initMaster(int argc,char *argv[])
 	p.hops = atoi(argv[3]);
 	p.identities = NULL;
 	
-	printf("Command line args processed\n");
+	#ifdef DEBUG
+		printf("Command line args processed\n");
+	#endif
 
 	if((sock = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
 		printf("error in socket creation\n");
@@ -57,7 +62,7 @@ void initMaster(int argc,char *argv[])
 	}
 
 	if(listen(sock, num_of_players) == -1) {
-		printf("listen error");
+		printf("listen error\n");
 		exit(-1);
 	}
 
@@ -68,29 +73,40 @@ void initMaster(int argc,char *argv[])
 	#endif
 }
 
-void* listenPlayer(void *args)
+/*void* listenPlayer(void *args)
 {
-	
 	printf("Player started\n");
+}*/
+
+void print_ring()
+{
+	int i;
+	for(i=0;i<num_of_players;i++)
+	{
+		#ifdef DEBUG
+			printf("Player %d\nIP address: %s\nListen Port: %d\n",player_list[i].id,player_list[i].ip_addr,player_list[i].listen_port);
+		#endif
+	}
 }
 
 void setupNetwork()
 {
 	struct sockaddr_in sock_client;
-	int client;
 	int slen = sizeof(sock_client);
 	int i,ret;
-	thread_args args;
+	//thread_args args;
+	char *a, *b, *c;
 	char msg[MAXLEN];
 	for(i=0;i<num_of_players;i++)
 	{
-		if ((client = accept(sock, (struct sockaddr *) &sock_client, &slen)) == -1) {
+		player_list[i].id = i;
+
+		if ((player_list[i].conn_port = accept(sock, (struct sockaddr *) &sock_client, &slen)) == -1) {
 			printf("accept call failed! \n");
 			exit(-1);
 		}
 	
-		ret = recv(client, msg, MAXLEN, 0);
-
+		ret = recv(player_list[i].conn_port, msg, MAXLEN, 0);
 		if ( ret == -1 )
 		{
 			printf("Receive error! \n");
@@ -98,20 +114,154 @@ void setupNetwork()
 		}
 		else if ( ret == 0)
 		{
-			close(client);
+			close(player_list[i].conn_port);
 			continue;
 		}
-
-		//save join msg coming from node	
 		
-		pthread_create(&(player_thread[i]),NULL,listenPlayer,(void *)&args);
+		a = strtok(msg,"\n");
+
+		#ifdef DEBUG
+			printf("Received %s message from player %d\n",a,i);
+		#endif
+
+		if(strcmp(a,"JOIN")==0)
+		{
+			a = strtok(NULL,"\n");
+			strcpy(player_list[i].ip_addr,a);
+			a = strtok(NULL,"\n");
+			player_list[i].listen_port = atoi(a);
+		}
+	
+//		pthread_create(&(player_thread[i]),NULL,listenPlayer,(void *)&args);
 
 	}
-	printf("All players joined\n");
+
+	#ifdef DEBUG	
+		printf("All players joined\n");
+	#endif
+
+	close(sock);
+	for(i=0;i<num_of_players;i++)
+	{
+		sprintf(msg,"INFO\n%d\n%d\n%s\n%d\n",i,(i+1)%num_of_players,player_list[(i+1)%num_of_players].ip_addr,player_list[(i+1)%num_of_players].listen_port);
+		if(send(player_list[i].conn_port,msg,strlen(msg),0)==-1)
+		{
+			printf("Sending failed\n");
+			exit(-1);
+		}
+		#ifdef DEBUG
+			printf("INFO message sent to player %d\n",i);	
+		#endif
+	}
+
+	#ifdef DEBUG
+		printf("The ring is\n");
+		print_ring();
+	#endif	
+
+//	sendPotato();
 }
 
-void sendPotato()
+void wait_for_message()
 {
+	int i;
+	char msg[MAXLEN];
+	char *a,*b;
+	fd_set readset;
+
+	while(1)
+	{
+		for(i=0;i<num_of_players;i++)
+	                FD_SET(player_list[i].conn_port,&readset);
+                select(0,&readset,NULL,NULL,NULL);
+		
+                for(i=0;i<num_of_players;i++)
+			if(FD_ISSET(player_list[i].conn_port,&readset))
+				break;
+
+		if(recv(player_list[i].conn_port, msg, MAXLEN, 0) == -1)
+		{
+			printf("Receive error! \n");
+			exit(-1);
+		}
+		a = strtok_r(msg,"\n",&b);
+
+		#ifdef DEBUG
+			printf("Received %s message from player %d\n",a,i);
+		#endif		
+
+		if(strcmp(a,"POTA")==0)
+		{
+			int n;
+			p.identities = malloc(MAXLEN*sizeof(char));
+			a = strtok_r(NULL,"\n",&b);
+			p.hops = atoi(a);
+			strcpy(p.identities,b);
+
+			#ifdef DEBUG
+				printf("\nReceived Potato\nPrinting trace now\n");
+			#endif
+			a = strtok(p.identities,"\n");
+			while(a)
+			{
+				n=atoi(a);
+				printf("%d\n",n);
+				a = strtok(NULL,"\n");
+			}
+			printf("\n");		
+			break;
+		}
+	}
+	
+}
+
+void end_game()
+{
+	int i;
+	char msg[MAXLEN];
+	sprintf(msg,"TERM");
+
+	for(i=0;i<num_of_players;i++)
+	{
+		if(send(player_list[i].conn_port,msg,strlen(msg),0)==-1)
+                {
+			printf("Sending failed\n");
+			exit(-1);
+		}
+		#ifdef DEBUG
+			printf("Terminate message sent to player %d\n",i);
+		#endif
+	}	
+
+	for(i=0;i<num_of_players;i++)
+		close(player_list[i].conn_port);
+	#ifdef DEBUG
+		printf("Exiting the master\n");
+	#endif
+}
+
+int sendPotato()
+{
+	char msg[MAXLEN];
+	if(p.hops)
+	{
+		int player_id = rand()%num_of_players;
+
+		#ifdef DEBUG
+			printf("Sending Potato to player %d\n",player_id);
+		#endif	
+
+		sprintf(msg,"POTA\n%d\n",p.hops);
+		if(send(player_list[player_id].conn_port,msg,strlen(msg),0)==-1)
+		{
+			printf("Sending failed\n");
+			exit(-1);
+		}
+		#ifdef DEBUG
+			printf("Sent Potato:\n%s\n",msg);
+		#endif
+	}
+	return p.hops;
 }
 
 void joinThreads()

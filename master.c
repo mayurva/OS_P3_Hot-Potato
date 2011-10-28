@@ -2,7 +2,7 @@
 #include<stdlib.h>
 int main(int argc, char *argv[])
 {
-        printf("%s\n%s\n%s",argv[1],argv[2],argv[3]);
+	int ret;
 	if(argc != 4)
 	{
 		printf("Incorrect set of arguments\n");
@@ -11,7 +11,9 @@ int main(int argc, char *argv[])
 	}
 	initMaster(argc,argv);
 	setupNetwork();
-	sendPotato();	
-	joinThreads();
+	ret = sendPotato();	
+	if(ret)		wait_for_message();
+	end_game();
+	//joinThreads();
 	return 0;
 }

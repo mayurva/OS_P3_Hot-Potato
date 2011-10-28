@@ -24,25 +24,15 @@ int main(int argc, char *argv[])
 		printf("Left Thread created\n");	
 	#endif
 	
-	if(pthread_create(&master_thread,NULL,masterConn,NULL) !=0 ) {
-		printf("Thread creation failed\n");
-		exit(-1);
-	}	
-	
-	#ifdef DEBUG
-		printf("Master Thread created\n");	
-	#endif
+	setupNetwork();
 
-	if(pthread_join(neighbor_thread[0],NULL) !=0 ) {
-		printf("Join failed\n");
-		exit(-1);
-	}
+	#ifdef DEBUG
+		printPlayerInfo();	
+		printf("Out here\n");
+	#endif
 	
-	if(pthread_join(master_thread,NULL) !=0 ) {
-		printf("Join failed\n");
-		exit(-1);
-	}
-	
+	wait_for_message();
+
 	#ifdef DEBUG
 		printf("Exiting program\n");
 	#endif

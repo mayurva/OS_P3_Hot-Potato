@@ -88,10 +88,10 @@ int createConnection(player_tracker p)
 
         ret = connect(p.conn_port, (struct sockaddr *) &sock_client, slen);
         if (ret == -1) {
-                printf("Connect failed! Check the IP and port number of the Sever! \n");
+                printf("Connect failed! Check the IP and port number of the Server! \n");
                 exit(-1);
         }
-        printf("Connected to the process\nProcess id %d",p.id);
+        printf("Connected to the process\nProcess id %d\n",p.id);
 }
 
 char* receiveMessage(player_tracker p)
@@ -104,7 +104,7 @@ void sendMessage(player_tracker p,char *message)
         char sendbuf[MAXLEN];
         strcpy(sendbuf,message);
         if(send(p.conn_port, sendbuf, MAXLEN, 0) == -1){
-                printf("send failed ");
+                printf("send failed\n ");
                 exit(-1);
         }
 
