@@ -16,20 +16,15 @@ player_tracker master;
 player me;
 player_tracker neighbor[2];
 int sock;
-int termflag;
 potato p;
 fd_set readset;
 
-pthread_t neighbor_thread[2];
-pthread_t master_thread;
+pthread_t left_thread;
 
 int initPlayer(char *argv[])
 {
-	struct sockaddr_in sock_server;
-
 	master.id = 0;
 	strcpy(master.ip_addr,argv[1]);
-	//printf("%s\n",argv[2]);
 	master.listen_port = atoi(argv[2]);
 
 	#ifdef DEBUG
@@ -39,39 +34,11 @@ int initPlayer(char *argv[])
 	
 	me = populatePublicIp(me);
 	
-	if ((sock= socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-		printf("error in socket creation\n");
-		exit(-1);
-	}
+	sock = createSocket();
+	me.listen_port= bindSocket(sock,master.listen_port,master.ip_addr);
 
-	me.listen_port= master.listen_port;
-
-        memset((char *) &sock_server, 0, sizeof(sock_server));
-        sock_server.sin_family = AF_INET;
-        sock_server.sin_port = htons(me.listen_port);
-        sock_server.sin_addr.s_addr = inet_addr(me.ip_addr);
-	while (bind(sock, (struct sockaddr *) &sock_server, sizeof(sock_server)) == -1) {
-                me.listen_port = (rand() % (65535-1024)) + 1024;
-                sock_server.sin_port = htons(me.listen_port);
-        }
-
-	#ifdef DEBUG
-		printf("Player listens on port %d\n",me.listen_port);
-		printf("Listen Socket created\n");
-	#endif
-
-        if ((master.conn_port = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-                printf("error in socket creation\n");
-                exit(-1);
-        }
-
-	if ((neighbor[1].conn_port = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-		printf("error in socket creation\n");
-		exit(-1);
-	}
-	
-
-//	termflag = 0;
+        master.conn_port = createSocket();
+	neighbor[1].conn_port = createSocket();
 
 	#ifdef DEBUG
 		printf("Connection Socket created\n");
@@ -79,49 +46,18 @@ int initPlayer(char *argv[])
 	#endif
 }
 
-void setNeighborData(int i,char *msg)
-{
-}
-
 void processPotato()
 {
-	/*while(!termflag)
-	{
-		//receive
-		while(1)
-		{
-			//receive potato
-			//buffer potato
-		}	
-		//attach identity
-		//send potato
-	}*/
 }
 
 void* leftNeighborConn(void *args)
 {
-	struct sockaddr_in sock_client;
-	int slen = sizeof(sock_client);
+
 	char msg[MAXLEN];
 	char *a;	
 
-	#ifdef DEBUG
-		printf("Listen for connection\n");
-	#endif
-
-        if(listen(sock,10) == -1) {
-                printf("listen error\n");
-                exit(-1);
-        }
-
-	if ((neighbor[0].conn_port = accept(sock, (struct sockaddr *) &sock_client, &slen)) == -1) {
-		printf("accept call failed! \n");
-		exit(-1);
-	}
-	
-	#ifdef DEBUG
-		printf("Connection accepted\n");
-	#endif
+	listenSocket(sock);
+	neighbor[0].conn_port = acceptConnection(sock);
 	
 	if(recv(neighbor[0].conn_port, msg, MAXLEN, 0) == -1)
         {
@@ -139,7 +75,8 @@ void* leftNeighborConn(void *args)
         }
 	memset(msg,0,MAXLEN);
 	FD_SET(neighbor[0].conn_port,&readset);
-
+	shutdown(sock,SHUT_RDWR);
+	close(sock);
 	#ifdef DEBUG
 		printf("Updated left neighbour info\n");
 	#endif
@@ -195,6 +132,12 @@ void wait_for_message()
 					#ifdef DEBUG
 						printf("Term Signal Received\n");
 					#endif
+					shutdown(master.conn_port,SHUT_RDWR);
+					close(master.conn_port);
+					shutdown(neighbor[0].conn_port,SHUT_RDWR);
+					close(neighbor[0].conn_port);
+					shutdown(neighbor[1].conn_port,SHUT_RDWR);
+					close(neighbor[1].conn_port);
 					break;
 				}
 				else if(strcmp(a,"POTA")==0)
@@ -210,7 +153,8 @@ void wait_for_message()
 					memset(p.identities,0,MAXLEN*sizeof(char));
 					sprintf(p.identities,"%d\n",me.id);
 					memset(b,0,strlen(b));
-					sprintf(msg,"POTA\n%d\n%s",p.hops-1,p.identities);
+					p.hops--;
+					sprintf(msg,"POTA\n%d\n%s",p.hops,p.identities);
 					#ifdef DEBUG
 						printf("\nPotato is\n%s\n",p.identities);
 					#endif
@@ -234,7 +178,7 @@ void wait_for_message()
 					}
 					else
 					{
-						j=rand()%2;	
+						j=getRandom(0,2);	
 				
 						printf("Sending potato to player %d\n",neighbor[j].id);
 	
@@ -288,7 +232,8 @@ void wait_for_message()
 				memset(p.identities,0,MAXLEN*sizeof(char));
 				sprintf(p.identities,"%s%d\n",b,me.id);
 				memset(b,0,strlen(b));
-				sprintf(msg,"POTA\n%d\n%s",p.hops-1,p.identities);
+				p.hops--;
+				sprintf(msg,"POTA\n%d\n%s",p.hops,p.identities);
 
 				#ifdef DEBUG
 					printf("\nPotato is\n%s\n",p.identities);
@@ -314,7 +259,7 @@ void wait_for_message()
 				}
 				else
 				{
-					j=rand()%2;	
+					j=getRandom(0,2);	
 				
 					printf("Sending potato to player %d\n",neighbor[j].id);
 	
@@ -401,7 +346,7 @@ void setupNetwork()
 	FD_SET(neighbor[1].conn_port,&readset);
 
 	
-        if(pthread_join(neighbor_thread[0],NULL) !=0 ) {
+        if(pthread_join(left_thread,NULL) !=0 ) {
                 printf("Join failed\n");
                 exit(-1);
         }

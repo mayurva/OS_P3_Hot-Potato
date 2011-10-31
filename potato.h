@@ -24,14 +24,7 @@ typedef struct potato_{
 	int hops;
 	char *identities;
 } potato;
-typedef struct thread_args_{
-}thread_args;
 
 player populatePublicIp(player);
-char* receiveMessage(player_tracker);
-
-
-/*typedef struct message_{
-} message;*/
 
 #endif

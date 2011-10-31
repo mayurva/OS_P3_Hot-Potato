@@ -1,5 +1,7 @@
 #include<stdio.h>
 #include<stdlib.h>
+#include"master.h"
+
 int main(int argc, char *argv[])
 {
 	int ret;
@@ -12,9 +14,6 @@ int main(int argc, char *argv[])
 	initMaster(argc,argv);
 	setupNetwork();
 	wait_for_message();
-//	ret = sendPotato();	
-//	if(ret)		wait_for_message();
 	end_game();
-	//joinThreads();
 	return 0;
 }

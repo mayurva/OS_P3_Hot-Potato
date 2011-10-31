@@ -12,19 +12,16 @@
 #include"potato.h"
 #include"master.h"
 
-
 potato p;
 int num_of_players;
 player master;
 player_tracker *player_list;
-pthread_t *player_thread;
 int *network_setup;
 int sock;
 fd_set readset;
 
 void initMaster(int argc,char *argv[])
 {
-	struct sockaddr_in sock_server;
 	int i;
 
 	master.id = 0;
@@ -34,13 +31,10 @@ void initMaster(int argc,char *argv[])
 		printf("in init master\n");
 	#endif
 	
-	//printf("%s\n%s\n%s",argv[0],argv[1],argv[2]);
-
 	master.listen_port = atoi(argv[1]);
 
 	num_of_players = atoi(argv[2]);
 	player_list = (player_tracker*)malloc(num_of_players*sizeof(player_tracker));	
-//	player_thread = (pthread_t*)malloc(num_of_players*sizeof(pthread_t));
 	network_setup = malloc(num_of_players*sizeof(int));
 	for(i=0;i<num_of_players;i++)
 		network_setup[i] = 0;
@@ -52,25 +46,9 @@ void initMaster(int argc,char *argv[])
 		printf("Command line args processed\n");
 	#endif
 
-	if((sock = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-		printf("error in socket creation\n");
-		exit(-1);
-	}
-
-	memset((char *) &sock_server, 0, sizeof(sock_server));
-	sock_server.sin_family = AF_INET;
-	sock_server.sin_port = htons(master.listen_port);
-	sock_server.sin_addr.s_addr = inet_addr(master.ip_addr);
-
-	if (bind(sock, (struct sockaddr *) &sock_server, sizeof(sock_server)) == -1) {
-		printf("Bind failed\n");
-		exit(-1);
-	}
-
-	if(listen(sock, num_of_players) == -1) {
-		printf("listen error\n");
-		exit(-1);
-	}
+	sock = createSocket();
+	bindSocket(sock,master.listen_port,master.ip_addr);
+	listenSocket(sock);
 
 	#ifdef DEBUG
 		printf("Master setup\n");
@@ -79,11 +57,6 @@ void initMaster(int argc,char *argv[])
 	printf("Potato Master on %s\n",master.ip_addr);
 	printf("Players = %d\nHops = %d\n",num_of_players,p.hops);
 }
-
-/*void* listenPlayer(void *args)
-{
-	printf("Player started\n");
-}*/
 
 void print_ring()
 {
@@ -98,20 +71,15 @@ void print_ring()
 
 void setupNetwork()
 {
-	struct sockaddr_in sock_client;
-	int slen = sizeof(sock_client);
 	int i,ret;
 	//thread_args args;
 	char *a, *b, *c;
 	char msg[MAXLEN];
 	for(i=0;i<num_of_players;i++)
 	{
-		player_list[i].id = i;
+		player_list[i].id = i+1;
 
-		if ((player_list[i].conn_port = accept(sock, (struct sockaddr *) &sock_client, &slen)) == -1) {
-			printf("accept call failed! \n");
-			exit(-1);
-		}
+		player_list[i].conn_port = acceptConnection(sock);
 		memset(msg,0,MAXLEN);	
 		ret = recv(player_list[i].conn_port, msg, MAXLEN, 0);
 		if ( ret == -1 )
@@ -120,7 +88,7 @@ void setupNetwork()
 			exit(-1);
 		}
 		else if ( ret == 0)
-		{
+		{	
 			close(player_list[i].conn_port);
 			continue;
 		}
@@ -128,7 +96,7 @@ void setupNetwork()
 		a = strtok(msg,"\n");
 
 		#ifdef DEBUG
-			printf("Received %s message from player %d\n",a,i);
+			printf("Received %s message from player %d\n",a,(i+1)%(num_of_players+1));
 		#endif
 
 		if(strcmp(a,"JOIN")==0)
@@ -140,25 +108,24 @@ void setupNetwork()
 		}
 		printf("Player %d is on %s\n",player_list[i].id,player_list[i].ip_addr);
 	
-//		pthread_create(&(player_thread[i]),NULL,listenPlayer,(void *)&args);
-
 	}
 
 	#ifdef DEBUG	
 		printf("All players joined\n");
 	#endif
 
+	shutdown(sock,SHUT_RDWR);
 	close(sock);
 	for(i=0;i<num_of_players;i++)
 	{
-		sprintf(msg,"INFO\n%d\n%d\n%s\n%d\n",i,(i+1)%num_of_players,player_list[(i+1)%num_of_players].ip_addr,player_list[(i+1)%num_of_players].listen_port);
+		sprintf(msg,"INFO\n%d\n%d\n%s\n%d\n",i+1,player_list[(i+1)%num_of_players].id,player_list[(i+1)%num_of_players].ip_addr,player_list[(i+1)%num_of_players].listen_port);
 		if(send(player_list[i].conn_port,msg,strlen(msg),0)==-1)
 		{
 			printf("Sending failed\n");
 			exit(-1);
 		}
 		#ifdef DEBUG
-			printf("INFO message sent to player %d\n",i);	
+			printf("INFO message sent to player %d\n",i+1);	
 		#endif
 	        FD_SET(player_list[i].conn_port,&readset);
 		
@@ -178,7 +145,7 @@ int networkSetup()
 	for(i=0;i<num_of_players;i++)
 		if(network_setup[i] == 0)
 			return FALSE;
-	printf("All players present ");
+	printf("All players present\n");
 	return TRUE;
 }
 
@@ -218,12 +185,13 @@ void wait_for_message()
 			if(FD_ISSET(player_list[i].conn_port,&readset))
 				break;
 
+		memset(msg,0,MAXLEN);
 		if(recv(player_list[i].conn_port, msg, MAXLEN, 0) == -1)
 		{
 			printf("Receive error! \n");
 			exit(-1);
 		}
-
+//		strcpy(b,"");
 		a = strtok_r(msg,"\n",&b);
 		#ifdef DEBUG
 			printf("Received %s message from player %d\n",a,i);
@@ -232,6 +200,7 @@ void wait_for_message()
 		if(strcmp(a,"POTA")==0)
 		{
 			p.identities = malloc(MAXLEN*sizeof(char));
+			memset(p.identities,0,MAXLEN);
 			a = strtok_r(NULL,"\n",&b);
 			p.hops = atoi(a);
 			strcpy(p.identities,b);
@@ -244,8 +213,11 @@ void wait_for_message()
 			while(a)
 			{
 				n=atoi(a);
-				printf("%d,",n);
+				printf("%d",n);
 				a = strtok(NULL,"\n");
+				if(a==NULL)
+					break;
+				printf(",");
 			}
 			printf("\n");		
 			free(p.identities);
@@ -260,7 +232,7 @@ void wait_for_message()
 				printf("n is %d\n",n);
 			#endif
 
-			network_setup[n] = 1;
+			network_setup[n-1] = 1;
 			if(networkSetup())
 			{
 				ret = sendPotato();
@@ -290,12 +262,15 @@ void end_game()
 			exit(-1);
 		}
 		#ifdef DEBUG
-			printf("Terminate message sent to player %d\n",i);
+			printf("Terminate message sent to player %d\n",i+1);
 		#endif
 	}	
 
 	for(i=0;i<num_of_players;i++)
+	{
+		shutdown(player_list[i].conn_port,SHUT_RDWR);
 		close(player_list[i].conn_port);
+	}
 	#ifdef DEBUG
 		printf("Exiting the master\n");
 	#endif
@@ -306,12 +281,12 @@ int sendPotato()
 	char msg[MAXLEN];
 	if(p.hops)
 	{
-		int player_id = rand()%num_of_players;
+		int player_id = getRandom(1,num_of_players+1);
 
 		printf("Sending Potato to player %d\n",player_id);
 
 		sprintf(msg,"POTA\n%d\n",p.hops);
-		if(send(player_list[player_id].conn_port,msg,strlen(msg),0)==-1)
+		if(send(player_list[player_id-1].conn_port,msg,strlen(msg),0)==-1)
 		{
 			printf("Sending failed\n");
 			exit(-1);
@@ -323,9 +298,3 @@ int sendPotato()
 	return p.hops;
 }
 
-void joinThreads()
-{
-	int i;
-	for(i=0;i<num_of_players;i++)
-		pthread_join(player_thread[i],NULL);
-}

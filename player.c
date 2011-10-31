@@ -15,7 +15,7 @@ int main(int argc, char *argv[])
 
 	initPlayer(argv);	//this will start the player initializing the data structures and variables
 	
-	if(pthread_create(&neighbor_thread[0],NULL,leftNeighborConn,NULL) !=0 )	{
+	if(pthread_create(&left_thread,NULL,leftNeighborConn,NULL) !=0 )	{
 		printf("Thread creation failed\n");
 		exit(-1);
 	}	
@@ -33,6 +33,7 @@ int main(int argc, char *argv[])
 	
 	wait_for_message();
 
+	//Add a end function
 	#ifdef DEBUG
 		printf("Exiting program\n");
 	#endif

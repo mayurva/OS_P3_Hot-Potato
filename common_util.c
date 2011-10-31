@@ -6,8 +6,18 @@
 #include <netinet/in.h>
 #include <ifaddrs.h>
 #include <net/if.h>
-
+#include<sys/time.h>
 #include"potato.h"
+
+int getRandom(int lower,int upper)
+{
+	struct timeval tv;
+	int seed;
+	gettimeofday(&tv,NULL);
+	seed = tv.tv_sec+tv.tv_usec;
+	srand(seed);
+	return ((rand()%(upper-lower))+lower);
+}
 
 player populatePublicIp(player p)
 {
@@ -54,9 +64,6 @@ player populatePublicIp(player p)
 				#ifdef DEBUG
 					printf("Player is binding to %s interface\n", ifa->ifa_name);
 				#endif
-				/*scanf("%s", intf);
-				if ( strcmp(intf, "n") == 0 )
-					continue;*/
 				sprintf(p.ip_addr, "%s", buf);
 				sprintf(p.iface_name, "%s", ifa->ifa_name);
 			}
@@ -73,6 +80,36 @@ player populatePublicIp(player p)
 		printf("\n\nMy public interface and IP is:  %s %s\n\n", p.iface_name, p.ip_addr);
 	#endif
 	return p;
+}
+
+void listenSocket(int soc)
+{
+	#ifdef DEBUG
+		printf("Listen for connection\n");
+	#endif
+
+        if(listen(soc,10) == -1) {
+                printf("listen error\n");
+                exit(-1);
+        }
+}
+
+int acceptConnection(int soc)
+{
+	int conn_port;
+	struct sockaddr_in sock_client;
+	int slen = sizeof(sock_client);
+	
+	if ((conn_port = accept(soc, (struct sockaddr *) &sock_client, &slen)) == -1) {
+		printf("accept call failed! \n");
+		exit(-1);
+	}
+	
+	#ifdef DEBUG
+		printf("Connection accepted\n");
+	#endif
+	
+	return conn_port;
 }
 
 int createConnection(player_tracker p)
@@ -101,6 +138,40 @@ int createConnection(player_tracker p)
         	printf("Connected to the process\nProcess id %d\n",p.id);
 	#endif
 }
+
+int createSocket()
+{
+	int soc;
+	if ((soc= socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+		printf("error in socket creation\n");
+		exit(-1);
+	}
+	#ifdef DEBUG
+		printf("Socket created\n");
+	#endif
+	return soc;
+}
+
+int bindSocket(int soc, int listen_port, char ip_addr[])
+{
+	struct sockaddr_in sock_server;	
+	memset((char *) &sock_server, 0, sizeof(sock_server));
+	sock_server.sin_family = AF_INET;
+	sock_server.sin_port = htons(listen_port);
+	sock_server.sin_addr.s_addr = inet_addr(ip_addr);
+	while (bind(soc, (struct sockaddr *) &sock_server, sizeof(sock_server)) == -1) {
+		listen_port = getRandom(1024,65636);
+		sock_server.sin_port = htons(listen_port);
+	}
+
+	#ifdef DEBUG
+		printf("Player listens on port %d\n",listen_port);
+		printf("Listen Socket created\n");
+	#endif
+
+	return listen_port;
+}
+
 
 char* receiveMessage(player_tracker p)
 {
