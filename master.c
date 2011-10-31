@@ -14,6 +14,7 @@ int main(int argc, char *argv[])
 	initMaster(argc,argv);
 	setupNetwork();
 	wait_for_message();
+	printf("\n");
 	end_game();
 	return 0;
 }

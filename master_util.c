@@ -47,14 +47,14 @@ void initMaster(int argc,char *argv[])
 	#endif
 
 	sock = createSocket();
-	bindSocket(sock,master.listen_port,master.ip_addr);
+	master.listen_port = bindSocket(sock,master.listen_port,master.ip_addr);
 	listenSocket(sock);
 
 	#ifdef DEBUG
 		printf("Master setup\n");
 		printf("Master details are\nid: %d\nIP addr: %s\nListen Port: %d\n",master.id,master.ip_addr,master.listen_port);
 	#endif
-	printf("Potato Master on %s\n",master.ip_addr);
+	printf("Potato Master on %s Port %d\n",master.ip_addr,master.listen_port);
 	printf("Players = %d\nHops = %d\n",num_of_players,p.hops);
 }
 
@@ -145,7 +145,7 @@ int networkSetup()
 	for(i=0;i<num_of_players;i++)
 		if(network_setup[i] == 0)
 			return FALSE;
-	printf("All players present\n");
+	printf("All players present");
 	return TRUE;
 }
 
@@ -208,7 +208,7 @@ void wait_for_message()
 			#ifdef DEBUG
 				printf("Received Potato\nIdentities array is %s\n",p.identities);
 			#endif
-			printf("Trace of Potato\n");
+			printf("Trace of Potato:\n");
 			a = strtok(p.identities,"\n");
 			while(a)
 			{
@@ -219,7 +219,6 @@ void wait_for_message()
 					break;
 				printf(",");
 			}
-			printf("\n");		
 			free(p.identities);
 			break;
 		}
@@ -283,7 +282,7 @@ int sendPotato()
 	{
 		int player_id = getRandom(1,num_of_players+1);
 
-		printf("Sending Potato to player %d\n",player_id);
+		printf(", Sending Potato to player %d\n",player_id);
 
 		sprintf(msg,"POTA\n%d\n",p.hops);
 		if(send(player_list[player_id-1].conn_port,msg,strlen(msg),0)==-1)
