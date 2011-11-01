@@ -23,7 +23,6 @@ fd_set readset;
 void initMaster(int argc,char *argv[])
 {
 	int i;
-
 	master.id = 0;
 	master = populatePublicIp(master);
 	
@@ -60,19 +59,16 @@ void initMaster(int argc,char *argv[])
 
 void print_ring()
 {
-	int i;
-	for(i=0;i<num_of_players;i++)
-	{
-		#ifdef DEBUG
+	#ifdef DEBUG
+		int i;
+		for(i=0;i<num_of_players;i++)
 			printf("Player %d\nIP address: %s\nListen Port: %d\n",player_list[i].id,player_list[i].ip_addr,player_list[i].listen_port);
-		#endif
-	}
+	#endif
 }
 
 void setupNetwork()
 {
 	int i,ret;
-	//thread_args args;
 	char *a, *b, *c;
 	char msg[MAXLEN];
 	for(i=0;i<num_of_players;i++)
@@ -135,8 +131,6 @@ void setupNetwork()
 		printf("The ring is\n");
 		print_ring();
 	#endif	
-
-//	sendPotato();
 }
 
 int networkSetup()
@@ -191,7 +185,6 @@ void wait_for_message()
 			printf("Receive error! \n");
 			exit(-1);
 		}
-//		strcpy(b,"");
 		a = strtok_r(msg,"\n",&b);
 		#ifdef DEBUG
 			printf("Received %s message from player %d\n",a,i);

@@ -46,10 +46,6 @@ int initPlayer(char *argv[])
 	#endif
 }
 
-void processPotato()
-{
-}
-
 void* leftNeighborConn(void *args)
 {
 
