@@ -20,6 +20,71 @@ int *network_setup;
 int sock;
 fd_set readset;
 
+int handleMessage(int i,char msg[])
+{
+	char *a,*b;
+	int n;
+	
+	if(msg)
+	{
+		a = strtok_r(msg,"\n",&b);
+		#ifdef DEBUG
+			printf("Received %s message from player %d\n",a,i+1);
+		#endif		
+
+		if(strcmp(a,"POTA")==0)
+		{
+			p.identities = malloc(MAXLEN*sizeof(char));
+			memset(p.identities,0,MAXLEN);
+			a = strtok_r(NULL,"\n",&b);
+			p.hops = atoi(a);
+			strcpy(p.identities,b);
+	
+			#ifdef DEBUG
+				printf("Received Potato\nIdentities array is %s\n",p.identities);
+			#endif
+			printf("Trace of Potato:\n");
+			a = strtok(p.identities,"\n");
+			while(a)
+			{
+				n=atoi(a);
+					printf("%d",n);
+				a = strtok(NULL,"\n");
+				if(a==NULL)
+					break;
+				printf(",");
+			}
+			free(p.identities);
+			return 0;
+		}
+		else if(strcmp(a,"CONN")==0)
+		{
+			a = strtok_r(NULL,"\n",&b);
+			n = atoi(a);
+		
+			#ifdef DEBUG
+				printf("n is %d\n",n);
+			#endif
+	
+			network_setup[n-1] = 1;
+			if(networkSetup())
+			{
+				int ret;
+				ret = sendPotato();
+				if(!ret)	return 0;
+			}
+		}
+		else if(strcmp(a,"JOIN")==0)
+		{
+			a = strtok_r(NULL,"\n",&b);
+			strcpy(player_list[i].ip_addr,a);
+			a = strtok_r(NULL,"\n",&b);
+			player_list[i].listen_port = atoi(a);
+		}
+	}
+	return 1;
+}
+
 void initMaster(int argc,char *argv[])
 {
 	int i;
@@ -89,19 +154,7 @@ void setupNetwork()
 			continue;
 		}
 		
-		a = strtok(msg,"\n");
-
-		#ifdef DEBUG
-			printf("Received %s message from player %d\n",a,(i+1)%(num_of_players+1));
-		#endif
-
-		if(strcmp(a,"JOIN")==0)
-		{
-			a = strtok(NULL,"\n");
-			strcpy(player_list[i].ip_addr,a);
-			a = strtok(NULL,"\n");
-			player_list[i].listen_port = atoi(a);
-		}
+		handleMessage(i,msg);
 		printf("Player %d is on %s\n",player_list[i].id,player_list[i].ip_addr);
 	
 	}
@@ -160,12 +213,13 @@ void wait_for_message()
 	char *a,*b;
 	int n,ret;
 	int nfds;
+	int flag = 1;
 	nfds = getMaxFd()+1;
 	#ifdef DEBUG
 		printf("Waiting for message\nnfds is %d\n",nfds);	
 	#endif
 
-	while(1)
+	while(flag)
 	{
 		for(i=0;i<num_of_players;i++)
 			FD_SET(player_list[i].conn_port,&readset);
@@ -185,54 +239,7 @@ void wait_for_message()
 			printf("Receive error! \n");
 			exit(-1);
 		}
-		a = strtok_r(msg,"\n",&b);
-		#ifdef DEBUG
-			printf("Received %s message from player %d\n",a,i);
-		#endif		
-
-		if(strcmp(a,"POTA")==0)
-		{
-			p.identities = malloc(MAXLEN*sizeof(char));
-			memset(p.identities,0,MAXLEN);
-			a = strtok_r(NULL,"\n",&b);
-			p.hops = atoi(a);
-			strcpy(p.identities,b);
-
-			#ifdef DEBUG
-				printf("Received Potato\nIdentities array is %s\n",p.identities);
-			#endif
-			printf("Trace of Potato:\n");
-			a = strtok(p.identities,"\n");
-			while(a)
-			{
-				n=atoi(a);
-				printf("%d",n);
-				a = strtok(NULL,"\n");
-				if(a==NULL)
-					break;
-				printf(",");
-			}
-			free(p.identities);
-			break;
-		}
-		else if(strcmp(a,"CONN")==0)
-		{
-			a = strtok_r(NULL,"\n",&b);
-			n = atoi(a);
-		
-			#ifdef DEBUG
-				printf("n is %d\n",n);
-			#endif
-
-			network_setup[n-1] = 1;
-			if(networkSetup())
-			{
-				ret = sendPotato();
-				if(!ret)
-					break;
-			}
-		}
-		
+		flag = handleMessage(i,msg);		
 		for(i=0;i<num_of_players;i++)
 			FD_CLR(player_list[i].conn_port,&readset);
 		FD_ZERO(&readset);

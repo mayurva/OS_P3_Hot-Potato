@@ -21,6 +21,118 @@ fd_set readset;
 
 pthread_t left_thread;
 
+void processPotato(char p_string[])
+{
+	char *a,*b;
+	a = strtok_r(p_string,"\n",&b);
+	p.hops = atoi(a);
+	char msg[MAXLEN];
+	memset(msg,0,MAXLEN);
+	
+	#ifdef DEBUG
+		printf("\nReceived potato from master with hops %d\n",p.hops);
+	#endif
+
+	p.identities = malloc(MAXLEN*sizeof(char));
+	memset(p.identities,0,MAXLEN*sizeof(char));
+
+	if(b==NULL)
+		sprintf(p.identities,"%d\n",me.id);
+	else
+		sprintf(p.identities,"%s%d\n",b,me.id);
+
+	memset(b,0,strlen(b));
+	p.hops--;
+	sprintf(msg,"POTA\n%d\n%s",p.hops,p.identities);
+	#ifdef DEBUG
+		printf("\nPotato is\n%s\n",p.identities);
+	#endif
+	if(p.hops == 0)
+	{
+		printf("I'm it\n");
+
+		#ifdef DEBUG
+			printf("Sending potato to the master\n");
+		#endif
+			
+	        if(send(master.conn_port,msg,strlen(msg),0)==-1)
+		{
+			printf("Sending failed\n");
+			exit(-1);
+		}
+	
+		#ifdef DEBUG
+			printf("Potato sent to the master\n");
+		#endif
+	}
+	else
+	{
+		int j;
+		j=getRandom(0,2);	
+
+		printf("Sending potato to player %d\n",neighbor[j].id);
+	
+		if(send(neighbor[j].conn_port,msg,strlen(msg),0)==-1)
+		{
+			printf("Sending failed\n");
+			exit(-1);
+		}
+                                
+		#ifdef DEBUG
+			printf("Potato sent to player %d\n",neighbor[j].id);
+		#endif
+	}
+	free(p.identities);
+}
+
+int handleMessage(char msg[])
+{
+	if(msg)
+	{
+		char *a,*b;
+		b = NULL;
+		a = strtok_r(msg,"\n",&b);
+        	if(strcmp(a,"LEFT")==0)
+        	{
+			a = strtok_r(NULL,"\n",&b);
+			neighbor[0].id = atoi(a);
+			a = strtok_r(NULL,"\n",&b);
+			strcpy(neighbor[0].ip_addr,a);
+		}
+		else if(strcmp(a,"TERM")==0)
+	       	{
+			#ifdef DEBUG
+				printf("Term Signal Received\n");
+			#endif
+			shutdown(master.conn_port,SHUT_RDWR);
+			close(master.conn_port);
+			shutdown(neighbor[0].conn_port,SHUT_RDWR);
+			close(neighbor[0].conn_port);
+			shutdown(neighbor[1].conn_port,SHUT_RDWR);
+			close(neighbor[1].conn_port);
+			return 0;
+		}
+		else if(strcmp(a,"INFO")==0)
+		{
+			a=strtok_r(NULL,"\n",&b);
+			me.id = atoi(a);
+			a=strtok_r(NULL,"\n",&b);
+			neighbor[1].id = atoi(a);
+			a=strtok_r(NULL,"\n",&b);
+			strcpy(neighbor[1].ip_addr,a);
+			a=strtok_r(NULL,"\n",&b);
+			neighbor[1].listen_port = atoi(a);
+			#ifdef DEBUG
+				printf("Right neighbor (id %d) info updated for player %d\n",neighbor[1].id,me.id);
+			#endif
+		}
+
+		else if(strcmp(a,"POTA")==0)
+			processPotato(b);
+	}
+	return 1;
+}
+
 int initPlayer(char *argv[])
 {
 	master.id = 0;
@@ -60,15 +172,8 @@ void* leftNeighborConn(void *args)
                 printf("Receive error! \n");
                 exit(-1);
         }
-        a = strtok(msg,"\n");
-        if(strcmp(a,"LEFT")==0)
-        {
-		a = strtok(NULL,"\n");
-		neighbor[0].id = atoi(a);
-		a = strtok(NULL,"\n");
-		strcpy(neighbor[0].ip_addr,a);
 	
-        }
+	handleMessage(msg);
 	memset(msg,0,MAXLEN);
 	FD_SET(neighbor[0].conn_port,&readset);
 	shutdown(sock,SHUT_RDWR);
@@ -84,7 +189,7 @@ void wait_for_message()
 	char msg[MAXLEN];
 	char *a,*b;
 	int ndfs;
-	memset(msg,0,MAXLEN);	
+	int flag = 1;
 	#ifdef DEBUG
 		printf("Inside wait for msg\n");
 	#endif
@@ -98,7 +203,7 @@ void wait_for_message()
 		printf("Master fd is %d\nleft neighbor fd is %d\nRgiht neighbor fd is %d\nndfs is %d\n",master.conn_port,neighbor[0].conn_port,neighbor[1].conn_port,ndfs);
 	#endif
 
-	while(1)
+	while(flag)
 	{
 		FD_SET(master.conn_port,&readset);
 		FD_SET(neighbor[0].conn_port,&readset);
@@ -108,7 +213,7 @@ void wait_for_message()
 			#ifdef DEBUG
 				printf("Some descriptor is ready to recieve\n");
 			#endif
-
+			memset(msg,0,MAXLEN);
 			if(FD_ISSET(master.conn_port,&readset))
 			{
 				if(recv(master.conn_port, msg, MAXLEN, 0) == -1)
@@ -116,81 +221,11 @@ void wait_for_message()
 					printf("Receive error! \n");
 					exit(-1);
 				}
-				b = NULL;
-				a = strtok_r(msg,"\n",&b);
-
-				#ifdef DEBUG
-					printf("message %s from master\n",a);	
-				#endif
-
-				if(strcmp(a,"TERM")==0)
-		        	{
-					#ifdef DEBUG
-						printf("Term Signal Received\n");
-					#endif
-					shutdown(master.conn_port,SHUT_RDWR);
-					close(master.conn_port);
-					shutdown(neighbor[0].conn_port,SHUT_RDWR);
-					close(neighbor[0].conn_port);
-					shutdown(neighbor[1].conn_port,SHUT_RDWR);
-					close(neighbor[1].conn_port);
-					break;
-				}
-				else if(strcmp(a,"POTA")==0)
-				{
-					a = strtok_r(NULL,"\n",&b);
-					p.hops = atoi(a);
-	
-					#ifdef DEBUG
-						printf("\nReceived potato from master with hops %d\n",p.hops);
-					#endif
-
-					p.identities = malloc(MAXLEN*sizeof(char));
-					memset(p.identities,0,MAXLEN*sizeof(char));
-					sprintf(p.identities,"%d\n",me.id);
-					memset(b,0,strlen(b));
-					p.hops--;
-					sprintf(msg,"POTA\n%d\n%s",p.hops,p.identities);
-					#ifdef DEBUG
-						printf("\nPotato is\n%s\n",p.identities);
-					#endif
-					if(p.hops == 0)
-					{
-						printf("I'm it\n");
-	
-						#ifdef DEBUG
-							printf("Sending potato to the master\n");
-						#endif
-			
-					        if(send(master.conn_port,msg,strlen(msg),0)==-1)
-						{
-							printf("Sending failed\n");
-							exit(-1);
-						}
-	
-						#ifdef DEBUG
-							printf("Potato sent to the master\n");
-						#endif
-					}
-					else
-					{
-						j=getRandom(0,2);	
-				
-						printf("Sending potato to player %d\n",neighbor[j].id);
-	
-		                                if(send(neighbor[j].conn_port,msg,strlen(msg),0)==-1)
-        		                        {
-                		                        printf("Sending failed\n");
-                        		                exit(-1);
-                                		}
-                                
-	                                	#ifdef DEBUG
-        	                                	printf("Potato sent to player %d\n",neighbor[j].id);
-                	                	#endif
-					}
-					free(p.identities);
-        	                }
-				memset(msg,0,MAXLEN);
+				flag = handleMessage(msg);	
+				FD_CLR(master.conn_port,&readset);
+				FD_CLR(neighbor[0].conn_port,&readset);
+				FD_CLR(neighbor[1].conn_port,&readset);
+				FD_ZERO(&readset);
 				continue;
 			}
 			else if(FD_ISSET(neighbor[0].conn_port,&readset))
@@ -213,66 +248,9 @@ void wait_for_message()
 				printf("Receive error! \n");
 				exit(-1);
 			}
-			b = NULL;
-			a = strtok_r(msg,"\n",&b);
-			if(strcmp(a,"POTA")==0)
-			{
-				a = strtok_r(NULL,"\n",&b);
-				p.hops = atoi(a);
 
-				#ifdef DEBUG
-					printf("\nReceived potato from player %d\nhop value is %d\n\n",neighbor[i].id,p.hops);
-				#endif
-
-				p.identities = malloc(MAXLEN*sizeof(char));
-				memset(p.identities,0,MAXLEN*sizeof(char));
-				sprintf(p.identities,"%s%d\n",b,me.id);
-				memset(b,0,strlen(b));
-				p.hops--;
-				sprintf(msg,"POTA\n%d\n%s",p.hops,p.identities);
-
-				#ifdef DEBUG
-					printf("\nPotato is\n%s\n",p.identities);
-				#endif
-
-				if(p.hops == 0)
-				{
-					printf("I'm it\n");
-	
-					#ifdef DEBUG
-						printf("Sending potato to the master\n");
-					#endif
-				
-				        if(send(master.conn_port,msg,strlen(msg),0)==-1)
-					{
-						printf("Sending failed\n");
-						exit(-1);
-					}
-
-					#ifdef DEBUG
-						printf("Potato sent to the master\n");
-					#endif
-				}
-				else
-				{
-					j=getRandom(0,2);	
-				
-					printf("Sending potato to player %d\n",neighbor[j].id);
-	
-        	                        if(send(neighbor[j].conn_port,msg,strlen(msg),0)==-1)
-	                                {
-                                	        printf("Sending failed\n");
-                        	                exit(-1);
-                	                }
-        	                        
-	                                #ifdef DEBUG
-                                	        printf("Potato sent to player %d\n",neighbor[j].id);
-                        	        #endif
-				}
-				free(p.identities);
-			}
+			flag = handleMessage(msg);
 		}
-		memset(msg,0,MAXLEN);
 		FD_CLR(master.conn_port,&readset);
 		FD_CLR(neighbor[0].conn_port,&readset);
 		FD_CLR(neighbor[1].conn_port,&readset);
@@ -309,21 +287,8 @@ void setupNetwork()
 		printf("Receive error! \n");
 		exit(-1);
 	}
-	a = strtok(msg,"\n");
-	if(strcmp(a,"INFO")==0)
-	{
-		a=strtok(NULL,"\n");
-		me.id = atoi(a);
-		a=strtok(NULL,"\n");
-		neighbor[1].id = atoi(a);
-		a=strtok(NULL,"\n");
-		strcpy(neighbor[1].ip_addr,a);
-		a=strtok(NULL,"\n");
-		neighbor[1].listen_port = atoi(a);
-		#ifdef DEBUG
-			printf("Right neighbor (id %d) info updated for player %d\n",neighbor[1].id,me.id);
-		#endif
-	}
+	handleMessage(msg);
+
 	printf("Connected as player %d\n",me.id);	
 
 	createConnection(neighbor[1]);
