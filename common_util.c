@@ -9,6 +9,63 @@
 #include<sys/time.h>
 #include"potato.h"
 
+void sendPotato(potato p,char msg[],int sock)
+{
+	if(send(sock,msg,strlen(msg),0)==-1)
+	{
+		printf("Sending failed\n");
+		exit(-1);
+	}
+	if(p.identities)
+	{
+		char buf[MAXLEN];
+		memset(buf,0,MAXLEN);
+		if(recv(sock, buf, MAXLEN, 0) == -1)
+		{
+			printf("Receive error! \n");
+			exit(-1);
+		}
+		if(send(sock,p.identities,strlen(p.identities),0)==-1)
+		{
+			printf("Sending failed\n");
+			exit(-1);
+		}
+	}
+}
+
+char* recvPotato(int sock,int len)
+{
+
+	#ifdef DEBUG
+		printf("Length of potato is %d\n",len);
+	#endif
+	char *identities;
+	if(len)
+	{
+		char msg[MAXLEN];
+		memset(msg,0,MAXLEN);
+		sprintf(msg,"ACKP");
+		if(send(sock,msg,strlen(msg),0)==-1)
+		{
+			printf("Sending failed\n");
+			exit(-1);
+		}
+		identities=malloc((len+10)*sizeof(char));
+		memset(identities,0,len+10);
+		if(recv(sock, identities, len+10, 0) == -1)
+		{
+			printf("Receive error! \n");
+			exit(-1);
+		}
+	}
+	else
+	{
+		identities=malloc(10*sizeof(char));
+		memset(identities,0,10);
+	}	
+	return identities;
+}
+
 int getRandom(int lower,int upper)
 {
 	struct timeval tv;

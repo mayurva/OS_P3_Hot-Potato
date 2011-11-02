@@ -21,7 +21,7 @@ fd_set readset;
 
 pthread_t left_thread;
 
-void processPotato(char p_string[])
+/*void processPotato(char p_string[])
 {
 	char *a,*b;
 	a = strtok_r(p_string,"\n",&b);
@@ -83,9 +83,9 @@ void processPotato(char p_string[])
 		#endif
 	}
 	free(p.identities);
-}
+}*/
 
-int handleMessage(char msg[])
+int handleMessage(char msg[],int sock)
 {
 	if(msg)
 	{
@@ -128,7 +128,47 @@ int handleMessage(char msg[])
 		}
 
 		else if(strcmp(a,"POTA")==0)
-			processPotato(b);
+		{
+			char temp[10];
+			memset(temp,0,10);
+			a = strtok_r(NULL,"\n",&b);
+			p.hops = atoi(a);
+			a = strtok_r(NULL,"\n",&b);
+
+			p.identities = (char*)recvPotato(sock,atoi(a));
+
+			p.hops--;
+			sprintf(temp,"%d\n",me.id);
+			strcat(p.identities,temp);
+			sprintf(msg,"POTA\n%d\n%d\n",p.hops,strlen(p.identities));
+			#ifdef DEBUG
+				printf("\nPotato is\n%s\nLength is %d\n",p.identities,strlen(p.identities));
+			#endif
+			if(p.hops == 0)
+			{
+				printf("I'm it\n");
+
+				#ifdef DEBUG
+					printf("Sending potato to the master\n");
+				#endif
+				sendPotato(p,msg,master.conn_port);
+				#ifdef DEBUG
+					printf("Potato sent to the master\n");
+				#endif
+			}
+			else
+			{
+				int j;
+				j=getRandom(0,2);	
+
+				printf("Sending potato to player %d\n",neighbor[j].id);
+				sendPotato(p,msg,neighbor[j].conn_port);
+				#ifdef DEBUG
+					printf("Potato sent to player %d\n",neighbor[j].id);
+				#endif
+			}
+			free(p.identities);
+		}
 	}
 	return 1;
 }
@@ -173,7 +213,7 @@ void* leftNeighborConn(void *args)
                 exit(-1);
         }
 	
-	handleMessage(msg);
+	handleMessage(msg,neighbor[0].conn_port);
 	memset(msg,0,MAXLEN);
 	FD_SET(neighbor[0].conn_port,&readset);
 	shutdown(sock,SHUT_RDWR);
@@ -221,7 +261,7 @@ void wait_for_message()
 					printf("Receive error! \n");
 					exit(-1);
 				}
-				flag = handleMessage(msg);	
+				flag = handleMessage(msg,master.conn_port);	
 				FD_CLR(master.conn_port,&readset);
 				FD_CLR(neighbor[0].conn_port,&readset);
 				FD_CLR(neighbor[1].conn_port,&readset);
@@ -249,7 +289,7 @@ void wait_for_message()
 				exit(-1);
 			}
 
-			flag = handleMessage(msg);
+			flag = handleMessage(msg,neighbor[i].conn_port);
 		}
 		FD_CLR(master.conn_port,&readset);
 		FD_CLR(neighbor[0].conn_port,&readset);
@@ -287,7 +327,7 @@ void setupNetwork()
 		printf("Receive error! \n");
 		exit(-1);
 	}
-	handleMessage(msg);
+	handleMessage(msg,master.conn_port);
 
 	printf("Connected as player %d\n",me.id);	
 
