@@ -1,11 +1,11 @@
 #include<stdio.h>
 #include<stdlib.h>
 #include<string.h>
-#include <netdb.h>
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <ifaddrs.h>
-#include <net/if.h>
+#include<netdb.h>
+#include<arpa/inet.h>
+#include<netinet/in.h>
+#include<ifaddrs.h>
+#include<net/if.h>
 #include<sys/time.h>
 #include"potato.h"
 
@@ -149,6 +149,10 @@ void listenSocket(int soc)
                 printf("listen error\n");
                 exit(-1);
         }
+
+	#ifdef DEBUG
+		printf("Out of Listen\n");
+	#endif
 }
 
 int acceptConnection(int soc)
@@ -172,27 +176,28 @@ int acceptConnection(int soc)
 int createConnection(player_tracker p)
 {
         struct sockaddr_in sock_client;
-        int slen = sizeof(sock_client);
+	int slen = sizeof(sock_client);
         int ret;
 
         memset((char *) &sock_client, 0, sizeof(sock_client));
 	
 	#ifdef DEBUG
-	        printf("Connecting to a process\nIP Addr: %s\nport: %d\n",p.ip_addr,p.listen_port);
+		printf("Connecting to a process\nIP Addr: %s\nport: %d\n",p.ip_addr,p.listen_port);
+		printf("Connection File fd is %d\n",p.conn_port);
 	#endif
 
         sock_client.sin_family = AF_INET;
         sock_client.sin_port = htons(p.listen_port);
-        sock_client.sin_addr.s_addr = inet_addr(p.ip_addr);
+	ret = inet_pton(AF_INET, p.ip_addr, (void *) &sock_client.sin_addr);
 
-        ret = connect(p.conn_port, (struct sockaddr *) &sock_client, slen);
-        if (ret == -1) {
-                printf("Connect failed! Check the IP and port number of the Server! \n");
-                exit(-1);
-        }
+	ret = connect(p.conn_port, (struct sockaddr *) &sock_client, slen);
+	if (ret == -1) {
+		printf("Connect failed! Check the IP and port number of the Server! \n");
+		exit(-1);
+	}
 	
 	#ifdef DEBUG
-        	printf("Connected to the process\nProcess id %d\n",p.id);
+		printf("Connected to the process\nProcess id %d\n",p.id);
 	#endif
 }
 
@@ -217,7 +222,7 @@ int bindSocket(int soc, int listen_port, char ip_addr[])
 	sock_server.sin_port = htons(listen_port);
 	sock_server.sin_addr.s_addr = inet_addr(ip_addr);
 	while (bind(soc, (struct sockaddr *) &sock_server, sizeof(sock_server)) == -1) {
-		listen_port = getRandom(1024,65636);
+		listen_port = getRandom(64500,65636);
 		sock_server.sin_port = htons(listen_port);
 	}
 
@@ -228,24 +233,3 @@ int bindSocket(int soc, int listen_port, char ip_addr[])
 
 	return listen_port;
 }
-
-
-char* receiveMessage(player_tracker p)
-{
-}
-
-//reduce the buffer length so that message needs to be sent in chunks
-void sendMessage(player_tracker p,char *message)
-{
-        char sendbuf[MAXLEN];
-        strcpy(sendbuf,message);
-        if(send(p.conn_port, sendbuf, MAXLEN, 0) == -1){
-                printf("send failed\n ");
-                exit(-1);
-        }
-
-	#ifdef DEBUG
-	        printf("%s message sent\n",message);
-	#endif
-}
-

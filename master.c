@@ -15,6 +15,8 @@ int main(int argc, char *argv[])
 	setupNetwork();
 	wait_for_message();
 	printf("\n");
-	end_game();
+	#ifdef DEBUG
+		printf("Exiting the master\n");
+	#endif
 	return 0;
 }

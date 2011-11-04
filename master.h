@@ -8,5 +8,7 @@ extern player_tracker *player_list;
 extern player master;
 extern potato p;
 
+char* recvPotato(int,int);
+
 #endif
 

@@ -12,4 +12,6 @@ extern potato p;
 extern pthread_t left_thread;
 
 void* leftNeighborConn(void*);
+char* recvPotato(int,int);
+
 #endif

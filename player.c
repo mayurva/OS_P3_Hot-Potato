@@ -33,7 +33,6 @@ int main(int argc, char *argv[])
 	
 	wait_for_message();
 
-	//Add a end function
 	#ifdef DEBUG
 		printf("Exiting program\n");
 	#endif

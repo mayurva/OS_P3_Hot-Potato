@@ -4,10 +4,10 @@
 #include<string.h>
 #include<sys/socket.h>
 #include<sys/types.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <netdb.h>
-#include <sys/select.h>
+#include<netinet/in.h>
+#include<arpa/inet.h>
+#include<netdb.h>
+#include<sys/select.h>
 
 #include"potato.h"
 #include"master.h"
@@ -19,6 +19,31 @@ player_tracker *player_list;
 int *network_setup;
 int sock;
 fd_set readset;
+
+void end_game()
+{
+	int i;
+	char msg[MAXLEN];
+	sprintf(msg,"TERM");
+
+	for(i=0;i<num_of_players;i++)
+	{
+		if(send(player_list[i].conn_port,msg,strlen(msg),0)==-1)
+                {
+			printf("Sending failed\n");
+			exit(-1);
+		}
+		#ifdef DEBUG
+			printf("Terminate message sent to player %d\n",i+1);
+		#endif
+	}	
+
+	for(i=0;i<num_of_players;i++)
+	{
+		shutdown(player_list[i].conn_port,SHUT_RDWR);
+		close(player_list[i].conn_port);
+	}
+}
 
 int handleMessage(int i,char msg[])
 {
@@ -39,6 +64,7 @@ int handleMessage(int i,char msg[])
 			a = strtok_r(NULL,"\n",&b);
 
 			p.identities=(char*)recvPotato(player_list[i].conn_port,atoi(a));
+			end_game();
 			printf("Trace of Potato:\n");
 			a = strtok(p.identities,"\n");
 			while(a)
@@ -249,55 +275,4 @@ void wait_for_message()
 	
 }
 
-void end_game()
-{
-	int i;
-	char msg[MAXLEN];
-	sprintf(msg,"TERM");
-
-	for(i=0;i<num_of_players;i++)
-	{
-		if(send(player_list[i].conn_port,msg,strlen(msg),0)==-1)
-                {
-			printf("Sending failed\n");
-			exit(-1);
-		}
-		#ifdef DEBUG
-			printf("Terminate message sent to player %d\n",i+1);
-		#endif
-	}	
-
-	for(i=0;i<num_of_players;i++)
-	{
-		shutdown(player_list[i].conn_port,SHUT_RDWR);
-		close(player_list[i].conn_port);
-	}
-	#ifdef DEBUG
-		printf("Exiting the master\n");
-	#endif
-}
-
-/*int createPotato()
-{
-	char msg[MAXLEN];
-	if(p.hops)
-	{
-		int player_id = getRandom(1,num_of_players+1);
-
-		printf(", Sending Potato to player %d\n",player_id);
-
-		sprintf(msg,"POTA\n%d\n",p.hops);
-		p.identities = NULL;
-		if(send(player_list[player_id-1].conn_port,msg,strlen(msg),0)==-1)
-		{
-			printf("Sending failed\n");
-			exit(-1);
-		}
-		#ifdef DEBUG
-			printf("Sent Potato:\n%s\n",msg);
-		#endif
-		sendPotato(p,player_list[player_id-1].conn_port);
-	}
-	return p.hops;
-}*/
 

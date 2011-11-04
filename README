@@ -1,3 +1,20 @@
-This is program for Hot Potato. Assignment for OS cour CSC 501
+This is a readme file for Hot Potato Assignment 501 course
+The attached zip contains a Makefile
+Note: The makefile does not use the -m32 flag
 
-Next task is to define message formats. Put the send receive logic for small buffer. Setup network. --EOD 26
+There are 5 C files 
+master.c The main program for the master
+player.c The main program for the player
+master_util.c master specific utility functions
+player_util.c master specific utility functions
+common_util.c Socket related and other functions common to both master and player 
+
+There are three header files
+potato.h Contains declaration of common data structures.
+master.h contains declaration of global variables for the master
+player.h contains declaration of global variables for the player
+
+The file REFERENCES contains all the references used.
+
+The player and master can be invoked as specified in the assignment.
+Note: If the master is invoked with a <port number> and bind fails, the program will randomly choose another port to bind to. This port will be printed on master side
